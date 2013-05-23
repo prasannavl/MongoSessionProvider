@@ -59,6 +59,8 @@ namespace PVL
     {
         private SessionStateSection _config = null;
         private ConnectionStringSettings _connectionStringSettings;
+        private String _databaseName;
+        private String _collectionName;
         private string _applicationName;
         private string _connectionString;
         private WriteConcern _writeMode = null;
@@ -84,7 +86,7 @@ namespace PVL
         private MongoCollection<BsonDocument> GetSessionCollection()
         {
             MongoClient client = new MongoClient(_connectionString);
-            return client.GetServer().GetDatabase("SessionState").GetCollection("Sessions");
+            return client.GetServer().GetDatabase(_databaseName).GetCollection(_collectionName);
         }
 
         public override void Initialize(string name, System.Collections.Specialized.NameValueCollection config)
@@ -114,6 +116,8 @@ namespace PVL
 
             // Initialize connection string.
             _connectionStringSettings = ConfigurationManager.ConnectionStrings[config["connectionStringName"]];
+            _databaseName = config["databaseName"] ?? "SessionState";
+            _collectionName = config["collectionName"] ?? "Sessions";
 
             if (_connectionStringSettings == null || _connectionStringSettings.ConnectionString.Trim() == "")
             {
