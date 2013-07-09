@@ -204,8 +204,8 @@ namespace PVL
                                 .Add("LockId", 0)
                                 .Add("Timeout", item.Timeout)
                                 .Add("Locked", false)
-                                .Add("Items", "")
-                                .Add("Flags", 1);
+                                .Add("Items", sessItems)
+                                .Add("Flags", 0);
 
                     sessionCollection.Save(doc, _writeMode);
                 }
