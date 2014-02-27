@@ -1,92 +1,90 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Web.SessionState;
+﻿// Author: Prasanna V. Loganathar
+// Project: MongoSessionProvider
+// Copyright (c) Launchark Technologies. All rights reserved.
+// See License.txt in the project root for license information.
+// 
+// Created: 5:26 AM 27-02-2014
+
+using System;
 using System.Configuration;
 using System.Configuration.Provider;
-using System.Web.Configuration;
-using MongoDB.Driver;
-using MongoDB.Bson;
 using System.Diagnostics;
 using System.IO;
-using MongoDB.Driver.Builders;
 using System.Web;
+using System.Web.Configuration;
+using System.Web.SessionState;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
 
 namespace PVL
 {
     /// <summary>
-    /// Custom ASP.NET Session State Provider using MongoDB as the state store.
-
-    /// Session state default store: 
-    /// "Sessions" collection within a "SessionState" database. 
-    /// 
-    /// Example session document:
-    /// {
-    ///    "_id" : "i2guetwsm0mgaibb1gqmodfq",
-    ///    "App" : "/",
-    ///    "Created" : ISODate("2013-02-21T22:27:32.091Z"),
-    ///    "Expires" : ISODate("2013-02-22T22:30:59.267Z"),
-    ///    "LockDate" : ISODate("2013-02-21T22:29:54.481Z"),
-    ///    "LockId" : 1,
-    ///    "Timeout" : 20,
-    ///    "Locked" : true,
-    ///    "Items" : "AQAAAP////8EVGVzdAgAAAABBkFkcmlhbg==",
-    ///    "Flags" : 0
-    /// }
-    /// 
-    /// Scheduled session cleanup:
-    /// db.Sessions.remove({"Expires" : {$lt : new Date() }})
-    /// 
-    /// Example web.config settings:
-    ///  
-    /// ..
-    /// <connectionStrings>
-    /// <add name="SessionState" connectionString="mongodb://localhost"/>
-    /// </connectionStrings>
-    /// <system.web>
-    ///     <sessionState mode="Custom" timeout="1440" cookieless="false" customProvider="MongoSessionStateProvider">
-    ///         <providers>
-    ///             <add name="MongoSessionStateProvider" type="PVL.MongoSessionProvider" connectionStringName="SessionState" writeExceptionsToEventLog="false"/>
-    ///         </providers>
-    ///     </sessionState>
-    /// </system.web>
-    /// ..
+    ///     Custom ASP.NET Session State Provider using MongoDB as the state store.
+    ///     Session state default store:
+    ///     "Sessions" collection within a "SessionState" database.
+    ///     Example session document:
+    ///     {
+    ///     "_id" : "i2guetwsm0mgaibb1gqmodfq",
+    ///     "App" : "/",
+    ///     "Created" : ISODate("2013-02-21T22:27:32.091Z"),
+    ///     "Expires" : ISODate("2013-02-22T22:30:59.267Z"),
+    ///     "LockDate" : ISODate("2013-02-21T22:29:54.481Z"),
+    ///     "LockId" : 1,
+    ///     "Timeout" : 20,
+    ///     "Locked" : true,
+    ///     "Items" : "AQAAAP////8EVGVzdAgAAAABBkFkcmlhbg==",
+    ///     "Flags" : 0
+    ///     }
+    ///     Scheduled session cleanup:
+    ///     db.Sessions.remove({"Expires" : {$lt : new Date() }})
+    ///     Example web.config settings:
+    ///     ..
+    ///     <connectionStrings>
+    ///         <add name="SessionState" connectionString="mongodb://localhost" />
+    ///     </connectionStrings>
+    ///     <system.web>
+    ///         <sessionState mode="Custom" timeout="1440" cookieless="false" customProvider="MongoSessionStateProvider">
+    ///             <providers>
+    ///                 <add name="MongoSessionStateProvider" type="PVL.MongoSessionProvider"
+    ///                     connectionStringName="SessionState" writeExceptionsToEventLog="false" />
+    ///             </providers>
+    ///         </sessionState>
+    ///     </system.web>
+    ///     ..
     /// </summary>
-    /// 
-
-
     public sealed class MongoSessionProvider : SessionStateStoreProviderBase
     {
-        private SessionStateSection _config = null;
-        private ConnectionStringSettings _connectionStringSettings;
-        private String _databaseName;
-        private String _collectionName;
-        private string _applicationName;
-        private string _connectionString;
-        private WriteConcern _writeMode = null;
-        private bool _writeExceptionsToEventLog;
-        private const string _exceptionMessage = "An error occurred. Please contact support if the problem persists.";
-        private const string _eventSource = "MongoSessionStateStore";
-        private const string _eventLog = "Application";
+        private const string ExceptionMessage = "An error occurred. Please contact support if the problem persists.";
+        private const string EventSource = "MongoSessionStateStore";
+        private const string EventLog = "Application";
+        private string applicationName;
+        private String collectionName;
+        private SessionStateSection config;
+        private string connectionString;
+        private ConnectionStringSettings connectionStringSettings;
+        private String databaseName;
+        private bool writeExceptionsToEventLog;
+        private WriteConcern writeMode;
 
 
         public string ApplicationName
         {
-            get { return _applicationName; }
+            get { return applicationName; }
         }
 
 
         public bool WriteExceptionsToEventLog
         {
-            get { return _writeExceptionsToEventLog; }
-            set { _writeExceptionsToEventLog = value; }
+            get { return writeExceptionsToEventLog; }
+            set { writeExceptionsToEventLog = value; }
         }
 
 
         private MongoCollection<BsonDocument> GetSessionCollection()
         {
-            MongoClient client = new MongoClient(_connectionString);
-            return client.GetServer().GetDatabase(_databaseName).GetCollection(_collectionName);
+            var client = new MongoClient(connectionString);
+            return client.GetServer().GetDatabase(databaseName).GetCollection(collectionName);
         }
 
         public override void Initialize(string name, System.Collections.Specialized.NameValueCollection config)
@@ -108,43 +106,42 @@ namespace PVL
             base.Initialize(name, config);
 
             // Initialize the ApplicationName property.
-            _applicationName = System.Web.Hosting.HostingEnvironment.ApplicationVirtualPath;
+            applicationName = System.Web.Hosting.HostingEnvironment.ApplicationVirtualPath;
 
             // Get <sessionState> configuration element.
             Configuration cfg = WebConfigurationManager.OpenWebConfiguration(ApplicationName);
-            _config = (SessionStateSection)cfg.GetSection("system.web/sessionState");
+            this.config = (SessionStateSection) cfg.GetSection("system.web/sessionState");
 
             // Initialize connection string.
-            _connectionStringSettings = ConfigurationManager.ConnectionStrings[config["connectionStringName"]];
-            _databaseName = config["databaseName"] ?? "SessionState";
-            _collectionName = config["collectionName"] ?? "Sessions";
+            connectionStringSettings = ConfigurationManager.ConnectionStrings[config["connectionStringName"]];
+            databaseName = config["databaseName"] ?? "SessionState";
+            collectionName = config["collectionName"] ?? "Sessions";
 
-            if (_connectionStringSettings == null || _connectionStringSettings.ConnectionString.Trim() == "")
+            if (connectionStringSettings == null || connectionStringSettings.ConnectionString.Trim() == "")
             {
                 throw new ProviderException("Connection string cannot be blank.");
             }
 
-            _connectionString = _connectionStringSettings.ConnectionString;
+            connectionString = connectionStringSettings.ConnectionString;
 
             // Initialize WriteExceptionsToEventLog
-            _writeExceptionsToEventLog = false;
+            writeExceptionsToEventLog = false;
 
             if (config["writeExceptionsToEventLog"] != null)
             {
                 if (config["writeExceptionsToEventLog"].ToUpper() == "TRUE")
-                    _writeExceptionsToEventLog = true;
+                    writeExceptionsToEventLog = true;
             }
 
-            _writeMode = WriteConcern.Unacknowledged;
+            writeMode = WriteConcern.Unacknowledged;
 
             if (config["writeConcern"] != null)
             {
                 int result;
                 if (int.TryParse(config["writeConcern"], out result))
                     if ((result > -2))
-                        _writeMode.W = result;
+                        writeMode.W = result;
             }
-
         }
 
         public override SessionStateStoreData CreateNewStoreData(System.Web.HttpContext context, int timeout)
@@ -160,14 +157,14 @@ namespace PVL
         }
 
         /// <summary>
-        /// Serialize is called by the SetAndReleaseItemExclusive method to 
-        /// convert the SessionStateItemCollection into a Base64 string to    
-        /// be stored in MongoDB.
+        ///     Serialize is called by the SetAndReleaseItemExclusive method to
+        ///     convert the SessionStateItemCollection into a Base64 string to
+        ///     be stored in MongoDB.
         /// </summary>
         private string Serialize(SessionStateItemCollection items)
         {
-            using (MemoryStream ms = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(ms))
+            using (var ms = new MemoryStream())
+            using (var writer = new BinaryWriter(ms))
             {
                 if (items != null)
                     items.Serialize(writer);
@@ -179,43 +176,44 @@ namespace PVL
         }
 
         /// <summary>
-        /// SessionStateProviderBase.SetAndReleaseItemExclusive
+        ///     SessionStateProviderBase.SetAndReleaseItemExclusive
         /// </summary>
         public override void SetAndReleaseItemExclusive(HttpContext context,
-          string id,
-          SessionStateStoreData item,
-          object lockId,
-          bool newItem)
+            string id,
+            SessionStateStoreData item,
+            object lockId,
+            bool newItem)
         {
             // Serialize the SessionStateItemCollection as a string.
-            string sessItems = Serialize((SessionStateItemCollection)item.Items);
-            DateTime cTime = DateTime.UtcNow;
+            var sessItems = Serialize((SessionStateItemCollection) item.Items);
+            var cTime = DateTime.UtcNow;
             try
             {
                 MongoCollection sessionCollection = GetSessionCollection();
                 if (newItem)
                 {
-                    BsonDocument doc = new BsonDocument()
-                                .Add("_id", id)
-                                .Add("App", ApplicationName)
-                                .Add("Created", cTime)
-                                .Add("Expires", cTime.AddMinutes((Double)item.Timeout))
-                                .Add("LockDate", cTime)
-                                .Add("LockId", 0)
-                                .Add("Timeout", item.Timeout)
-                                .Add("Locked", false)
-                                .Add("Items", sessItems)
-                                .Add("Flags", 0);
+                    var doc = new BsonDocument()
+                        .Add("_id", id)
+                        .Add("App", ApplicationName)
+                        .Add("Created", cTime)
+                        .Add("Expires", cTime.AddMinutes(item.Timeout))
+                        .Add("LockDate", cTime)
+                        .Add("LockId", 0)
+                        .Add("Timeout", item.Timeout)
+                        .Add("Locked", false)
+                        .Add("Items", sessItems)
+                        .Add("Flags", 0);
 
-                    sessionCollection.Save(doc, _writeMode);
+                    sessionCollection.Save(doc, writeMode);
                 }
                 else
                 {
-                    var query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName), Query.EQ("LockId", (Int32)lockId));
-                    var update = Update.Set("Expires", cTime.AddMinutes((Double)item.Timeout));
+                    var query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName),
+                        Query.EQ("LockId", (Int32) lockId));
+                    var update = Update.Set("Expires", cTime.AddMinutes(item.Timeout));
                     update.Set("Items", sessItems);
                     update.Set("Locked", false);
-                    sessionCollection.Update(query, update, _writeMode);
+                    sessionCollection.Update(query, update, writeMode);
                 }
             }
             catch (Exception e)
@@ -223,54 +221,54 @@ namespace PVL
                 if (WriteExceptionsToEventLog)
                 {
                     WriteToEventLog(e, "SetAndReleaseItemExclusive");
-                    throw new ProviderException(_exceptionMessage);
+                    throw new ProviderException(ExceptionMessage);
                 }
                 throw;
             }
         }
 
         /// <summary>
-        /// SessionStateProviderBase.GetItem
+        ///     SessionStateProviderBase.GetItem
         /// </summary>
         public override SessionStateStoreData GetItem(HttpContext context,
-          string id,
-          out bool locked,
-          out TimeSpan lockAge,
-          out object lockId,
-          out SessionStateActions actionFlags)
+            string id,
+            out bool locked,
+            out TimeSpan lockAge,
+            out object lockId,
+            out SessionStateActions actionFlags)
         {
             return GetSessionStoreItem(false, context, id, out locked,
-              out lockAge, out lockId, out actionFlags);
+                out lockAge, out lockId, out actionFlags);
         }
 
         /// <summary>
-        /// SessionStateProviderBase.GetItemExclusive
+        ///     SessionStateProviderBase.GetItemExclusive
         /// </summary>
         public override SessionStateStoreData GetItemExclusive(HttpContext context,
-          string id,
-          out bool locked,
-          out TimeSpan lockAge,
-          out object lockId,
-          out SessionStateActions actionFlags)
+            string id,
+            out bool locked,
+            out TimeSpan lockAge,
+            out object lockId,
+            out SessionStateActions actionFlags)
         {
             return GetSessionStoreItem(true, context, id, out locked,
-              out lockAge, out lockId, out actionFlags);
+                out lockAge, out lockId, out actionFlags);
         }
 
         /// <summary>
-        /// GetSessionStoreItem is called by both the GetItem and 
-        /// GetItemExclusive methods. GetSessionStoreItem retrieves the 
-        /// session data from the data source. If the lockRecord parameter
-        /// is true (in the case of GetItemExclusive), then GetSessionStoreItem
-        /// locks the record and sets a new LockId and LockDate.
+        ///     GetSessionStoreItem is called by both the GetItem and
+        ///     GetItemExclusive methods. GetSessionStoreItem retrieves the
+        ///     session data from the data source. If the lockRecord parameter
+        ///     is true (in the case of GetItemExclusive), then GetSessionStoreItem
+        ///     locks the record and sets a new LockId and LockDate.
         /// </summary>
         private SessionStateStoreData GetSessionStoreItem(bool lockRecord,
-          HttpContext context,
-          string id,
-          out bool locked,
-          out TimeSpan lockAge,
-          out object lockId,
-          out SessionStateActions actionFlags)
+            HttpContext context,
+            string id,
+            out bool locked,
+            out TimeSpan lockAge,
+            out object lockId,
+            out SessionStateActions actionFlags)
         {
             // Initial values for return value and out parameters.
             SessionStateStoreData item = null;
@@ -280,17 +278,16 @@ namespace PVL
             actionFlags = 0;
 
             // DateTime to check if current session item is expired.
-            DateTime expires;
             // String to hold serialized SessionStateItemCollection.
-            string serializedItems = "";
+            var serializedItems = "";
             // True if a record is found in the database.
-            bool foundRecord = false;
+            var foundRecord = false;
             // True if the returned session item is expired and needs to be deleted.
-            bool deleteData = false;
+            var deleteData = false;
             // Timeout value from the data store.
-            int timeout = 0;
+            var timeout = 0;
             IMongoQuery query = null;
-            DateTime cTime = DateTime.UtcNow;
+            var cTime = DateTime.UtcNow;
             try
             {
                 MongoCollection sessionCollection = GetSessionCollection();
@@ -300,7 +297,8 @@ namespace PVL
                 // Obtain a lock if possible. Ignore the record if it is expired.
                 if (lockRecord)
                 {
-                    query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName), Query.EQ("Locked", false), Query.GT("Expires", cTime));
+                    query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName), Query.EQ("Locked", false),
+                        Query.GT("Expires", cTime));
                     var update = Update.Set("Locked", true);
                     update.Set("LockDate", cTime);
                     var result = sessionCollection.Update(query, update);
@@ -310,11 +308,6 @@ namespace PVL
                         // No record was updated because the record was locked or not found.
                         locked = true;
                     }
-                    else
-                    {
-                        // The record was updated.
-                        locked = false;
-                    }
                 }
 
                 // Retrieve the current session item information.
@@ -323,7 +316,7 @@ namespace PVL
 
                 if (results != null)
                 {
-                    expires = results["Expires"].AsDateTime;
+                    var expires = results["Expires"].AsDateTime;
 
                     if (expires < cTime)
                     {
@@ -338,7 +331,7 @@ namespace PVL
                     serializedItems = results["Items"].AsString;
                     lockId = results["LockId"].AsInt32;
                     lockAge = cTime.Subtract(results["LockDate"].AsDateTime);
-                    actionFlags = (SessionStateActions)results["Flags"].AsInt32;
+                    actionFlags = (SessionStateActions) results["Flags"].AsInt32;
                     timeout = results["Timeout"].AsInt32;
                 }
 
@@ -347,7 +340,7 @@ namespace PVL
                 if (deleteData)
                 {
                     query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName));
-                    sessionCollection.Remove(query, _writeMode);
+                    sessionCollection.Remove(query, writeMode);
                 }
 
                 // The record was not found. Ensure that locked is false.
@@ -359,17 +352,17 @@ namespace PVL
                 // and create the SessionStateStoreItem to return.
                 if (foundRecord && !locked)
                 {
-                    lockId = (int)lockId + 1;
+                    lockId = (int) lockId + 1;
 
                     query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName));
-                    var update = Update.Set("LockId", (int)lockId);
+                    var update = Update.Set("LockId", (int) lockId);
                     update.Set("Flags", 0);
-                    sessionCollection.Update(query, update, _writeMode);
+                    sessionCollection.Update(query, update, writeMode);
 
                     // If the actionFlags parameter is not InitializeItem, 
                     // deserialize the stored SessionStateItemCollection.
                     if (actionFlags == SessionStateActions.InitializeItem)
-                        item = CreateNewStoreData(context, (int)_config.Timeout.TotalMinutes);
+                        item = CreateNewStoreData(context, (int) config.Timeout.TotalMinutes);
                     else
                         item = Deserialize(context, serializedItems, timeout);
                 }
@@ -379,7 +372,7 @@ namespace PVL
                 if (WriteExceptionsToEventLog)
                 {
                     WriteToEventLog(e, "GetSessionStoreItem");
-                    throw new ProviderException(_exceptionMessage);
+                    throw new ProviderException(ExceptionMessage);
                 }
 
                 throw;
@@ -389,55 +382,54 @@ namespace PVL
         }
 
         private SessionStateStoreData Deserialize(HttpContext context,
-         string serializedItems, int timeout)
+            string serializedItems, int timeout)
         {
-            using (MemoryStream ms =
-              new MemoryStream(Convert.FromBase64String(serializedItems)))
+            using (var ms =
+                new MemoryStream(Convert.FromBase64String(serializedItems)))
             {
-
-                SessionStateItemCollection sessionItems =
-                  new SessionStateItemCollection();
+                var sessionItems =
+                    new SessionStateItemCollection();
 
                 if (ms.Length > 0)
                 {
-                    using (BinaryReader reader = new BinaryReader(ms))
+                    using (var reader = new BinaryReader(ms))
                     {
                         sessionItems = SessionStateItemCollection.Deserialize(reader);
                     }
                 }
 
                 return new SessionStateStoreData(sessionItems,
-                  SessionStateUtility.GetSessionStaticObjects(context),
-                  timeout);
+                    SessionStateUtility.GetSessionStaticObjects(context),
+                    timeout);
             }
         }
 
         public override void CreateUninitializedItem(System.Web.HttpContext context, string id, int timeout)
         {
-            DateTime cTime = DateTime.UtcNow;
-            BsonDocument doc = new BsonDocument()
-                                .Add("_id", id)
-                                .Add("App", ApplicationName)
-                                .Add("Created", cTime)
-                                .Add("Expires", cTime.AddMinutes((Double)timeout))
-                                .Add("LockDate", cTime)
-                                .Add("LockId", 0)
-                                .Add("Timeout", timeout)
-                                .Add("Locked", false)
-                                .Add("Items", "")
-                                .Add("Flags", 1);
+            var cTime = DateTime.UtcNow;
+            var doc = new BsonDocument()
+                .Add("_id", id)
+                .Add("App", ApplicationName)
+                .Add("Created", cTime)
+                .Add("Expires", cTime.AddMinutes(timeout))
+                .Add("LockDate", cTime)
+                .Add("LockId", 0)
+                .Add("Timeout", timeout)
+                .Add("Locked", false)
+                .Add("Items", "")
+                .Add("Flags", 1);
 
             try
             {
                 MongoCollection sessionCollection = GetSessionCollection();
-                sessionCollection.Insert(doc, _writeMode);
+                sessionCollection.Insert(doc, writeMode);
             }
             catch (Exception e)
             {
                 if (WriteExceptionsToEventLog)
                 {
                     WriteToEventLog(e, "CreateUninitializedItem");
-                    throw new ProviderException(_exceptionMessage);
+                    throw new ProviderException(ExceptionMessage);
                 }
 
                 throw;
@@ -445,23 +437,24 @@ namespace PVL
         }
 
         /// <summary>
-        /// This is a helper function that writes exception detail to the 
-        /// event log. Exceptions are written to the event log as a security
-        /// measure to ensure private database details are not returned to 
-        /// browser. If a method does not return a status or Boolean
-        /// indicating the action succeeded or failed, the caller also 
-        /// throws a generic exception.
+        ///     This is a helper function that writes exception detail to the
+        ///     event log. Exceptions are written to the event log as a security
+        ///     measure to ensure private database details are not returned to
+        ///     browser. If a method does not return a status or Boolean
+        ///     indicating the action succeeded or failed, the caller also
+        ///     throws a generic exception.
         /// </summary>
         private void WriteToEventLog(Exception e, string action)
         {
-            using (EventLog log = new EventLog())
+            using (var log = new EventLog())
             {
-                log.Source = _eventSource;
-                log.Log = _eventLog;
+                log.Source = EventSource;
+                log.Log = EventLog;
 
-                string message =
-                  String.Format("An exception occurred communicating with the data source.\n\nAction: {0}\n\nException: {1}",
-                  action, e.ToString());
+                var message =
+                    String.Format(
+                        "An exception occurred communicating with the data source.\n\nAction: {0}\n\nException: {1}",
+                        action, e);
 
                 log.WriteEntry(message);
             }
@@ -473,54 +466,52 @@ namespace PVL
 
         public override void EndRequest(System.Web.HttpContext context)
         {
-
         }
 
         public override void InitializeRequest(System.Web.HttpContext context)
         {
-
         }
 
         public override void ReleaseItemExclusive(System.Web.HttpContext context, string id, object lockId)
         {
-
-            var query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName), Query.EQ("LockId", (Int32)lockId));
+            var query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName),
+                Query.EQ("LockId", (Int32) lockId));
             var update = Update.Set("Locked", false);
-            update.Set("Expires", DateTime.UtcNow.AddMinutes(_config.Timeout.TotalMinutes));
+            update.Set("Expires", DateTime.UtcNow.AddMinutes(config.Timeout.TotalMinutes));
 
             try
             {
                 MongoCollection sessionCollection = GetSessionCollection();
-                sessionCollection.Update(query, update, _writeMode);
+                sessionCollection.Update(query, update, writeMode);
             }
             catch (Exception e)
             {
                 if (WriteExceptionsToEventLog)
                 {
                     WriteToEventLog(e, "ReleaseItemExclusive");
-                    throw new ProviderException(_exceptionMessage);
+                    throw new ProviderException(ExceptionMessage);
                 }
                 throw;
             }
         }
 
-        public override void RemoveItem(System.Web.HttpContext context, string id, object lockId, SessionStateStoreData item)
+        public override void RemoveItem(System.Web.HttpContext context, string id, object lockId,
+            SessionStateStoreData item)
         {
-
-
-            var query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName), Query.EQ("LockId", (Int32)lockId));
+            var query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName),
+                Query.EQ("LockId", (Int32) lockId));
 
             try
             {
                 MongoCollection sessionCollection = GetSessionCollection();
-                sessionCollection.Remove(query, _writeMode);
+                sessionCollection.Remove(query, writeMode);
             }
             catch (Exception e)
             {
                 if (WriteExceptionsToEventLog)
                 {
                     WriteToEventLog(e, "RemoveItem");
-                    throw new ProviderException(_exceptionMessage);
+                    throw new ProviderException(ExceptionMessage);
                 }
 
                 throw;
@@ -529,21 +520,20 @@ namespace PVL
 
         public override void ResetItemTimeout(System.Web.HttpContext context, string id)
         {
-
             var query = Query.And(Query.EQ("_id", id), Query.EQ("App", ApplicationName));
-            var update = Update.Set("Expires", DateTime.UtcNow.AddMinutes(_config.Timeout.TotalMinutes));
+            var update = Update.Set("Expires", DateTime.UtcNow.AddMinutes(config.Timeout.TotalMinutes));
 
             try
             {
                 MongoCollection sessionCollection = GetSessionCollection();
-                sessionCollection.Update(query, update, _writeMode);
+                sessionCollection.Update(query, update, writeMode);
             }
             catch (Exception e)
             {
                 if (WriteExceptionsToEventLog)
                 {
                     WriteToEventLog(e, "ResetItemTimeout");
-                    throw new ProviderException(_exceptionMessage);
+                    throw new ProviderException(ExceptionMessage);
                 }
                 throw;
             }
