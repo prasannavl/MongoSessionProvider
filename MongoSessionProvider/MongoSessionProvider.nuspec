@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>PVL.MongoSessionProvider</id>
+    <version>$version$</version>
+    <title>MongoDB Session Provider</title>
+    <authors>$author$</authors>
+    <owners>$author$</owners>
+    <projectUrl>https://github.com/prasannavl/MongoSessionProvider</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>$description$</description>
+    <releaseNotes>Fix: Initialized session items.</releaseNotes>
+    <copyright>Copyright 2014</copyright>
+    <tags>mongodb session asp.net</tags>
+  </metadata>
+</package>
