@@ -153,7 +153,8 @@ namespace PVL
 
         public override bool SetItemExpireCallback(SessionStateItemExpireCallback expireCallback)
         {
-            return false;
+            setItemExpireCallback = expireCallback;
+            return true;
         }
 
         /// <summary>
