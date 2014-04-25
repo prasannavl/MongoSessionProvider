@@ -66,7 +66,7 @@ namespace PVL
         private String databaseName;
         private bool writeExceptionsToEventLog;
         private WriteConcern writeMode;
-
+        private SessionStateItemExpireCallback setItemExpireCallback;
 
         public string ApplicationName
         {
@@ -324,6 +324,11 @@ namespace PVL
                         locked = false;
                         // The session was expired. Mark the data for deletion.
                         deleteData = true;
+                        // callback Session_End in global.asax
+                        if (setItemExpireCallback != null)
+                        {
+                            setItemExpireCallback.Invoke(id, Deserialize(context, results["Items"].AsString, timeout));
+                        }
                     }
                     else
                         foundRecord = true;
