@@ -11,9 +11,7 @@ PM> Install-Package PVL.MongoSessionProvider
 
 NuGet Pacakge Link: https://nuget.org/packages/PVL.MongoSessionProvider
 
-Code: https://github.com/prasannavl/MongoSessionProvider
-
-More info here: https://www.prasannavl.com/2013/02/mongodb-session-state-provider-for.html
+Details: https://www.prasannavl.com/2013/02/mongodb-session-state-provider-for.html
 
 Example session document:
 
