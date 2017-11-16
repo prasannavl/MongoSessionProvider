@@ -3,6 +3,10 @@ MongoSessionProvider
 
 ASP.NET Session Provider for MongoDB
 
+### Status Note
+
+> This is not maintained, and has not been since 2014. A lot has changed since then, and ASP.NET Core provides much better designed paradigms. That being said, it should work fine if you need to support some legacy code. 
+
 Installation:
 
 ```
